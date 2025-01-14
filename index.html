@@ -1,0 +1,164 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classroom GIF Feedback System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f0f0f0;
+        }
+        #feedback-display img {
+            max-width: 100%;
+            height: auto;
+        }
+        .controls {
+            margin-top: 20px;
+        }
+        .controls label {
+            margin-right: 10px;
+        }
+        .controls input {
+            margin: 5px;
+        }
+        #visualizer {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            height: 100px;
+            margin: 20px auto;
+            background-color: #333;
+            width: 80%;
+            position: relative;
+            overflow: hidden;
+        }
+        .bar {
+            width: 1%;
+            background-color: #4caf50;
+            margin: 0 0.2%;
+        }
+    </style>
+</head>
+<body>
+    <h1>Classroom GIF Feedback System</h1>
+    <div id="feedback-display">
+        <img id="feedback-gif" src="" alt="Feedback GIF" width="800px" height="800px">
+    </div>
+    <div class="controls">
+        <p>Score: <span id="score">0</span></p>
+        <label for="threshold">Threshold:</label>
+        <input type="range" id="threshold" min="10" max="100" step="10" value="30">
+        <span id="threshold-value">100</span>
+        <br>
+        <label for="bg-color">Background Color:</label>
+        <input type="color" id="bg-color" value="#ffffff">
+    </div>
+    <div id="visualizer"></div>
+
+    <script>
+const gifUrls = [
+'./pet/1.gif', // 0-1000
+'./pet/2.gif', // 1001-2000
+'./pet/3.gif', // 2001-3000
+'./pet/4.gif', // 3001-4000
+'./pet/5.gif', // 4001-5000
+'./pet/6.gif', // 5001-6000
+'./pet/7.gif', // 6001-7000
+'./pet/8.gif', // 7001-8000
+'./pet/9.gif', // 8001-9000
+'./pet/10.gif' // 9001-10000
+];
+
+        const scoreDisplay = document.getElementById('score');
+        const thresholdSlider = document.getElementById('threshold');
+        const thresholdValue = document.getElementById('threshold-value');
+        const bgColorPicker = document.getElementById('bg-color');
+        const visualizer = document.getElementById('visualizer');
+        const feedbackGif = document.getElementById('feedback-gif');
+
+        let audioContext;
+        let analyser;
+        let dataArray;
+        let score = 0;
+
+        // Update threshold value display
+        thresholdSlider.addEventListener('input', () => {
+            thresholdValue.textContent = thresholdSlider.value;
+        });
+
+        // Update background color
+        bgColorPicker.addEventListener('input', () => {
+            document.body.style.backgroundColor = bgColorPicker.value;
+        });
+
+        // Initialize microphone and audio analysis
+        async function initializeAudio() {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const source = audioContext.createMediaStreamSource(stream);
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+            source.connect(analyser);
+            createVisualizerBars();
+            analyzeAudio();
+        }
+
+        // Create bars for the visualizer
+        function createVisualizerBars() {
+            for (let i = 0; i < analyser.frequencyBinCount; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'bar';
+                bar.style.width = `${100 / analyser.frequencyBinCount}%`;
+                visualizer.appendChild(bar);
+            }
+        }
+
+// Analyze audio levels
+function analyzeAudio() {
+    analyser.getByteFrequencyData(dataArray);
+
+    // Calculate average volume from frequency data
+    const avgVolume = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
+
+    // Retrieve and parse threshold value
+    const threshold = parseInt(thresholdSlider.value, 10);
+
+    // DEBUG: Log avgVolume and threshold for testing
+    console.log(`Average Volume: ${avgVolume}, Threshold: ${threshold}`);
+
+    // Update visualizer bars
+    const bars = document.getElementsByClassName('bar');
+    for (let i = 0; i < bars.length; i++) {
+        bars[i].style.height = `${dataArray[i]}%`;
+    }
+
+    // Update score based on threshold comparison
+    if (avgVolume < threshold) {
+                score += 1; // Increment score for every quiet second
+            } else {
+                score = Math.max(0, Math.floor(score * 0.985)); // Decrease score by 10% if loud
+            }
+
+            scoreDisplay.textContent = `Score: ${score}`;
+
+
+    // Update GIF based on score range
+    const gifIndex = Math.min(Math.floor(score / 800), gifUrls.length - 1);
+    feedbackGif.src = gifUrls[gifIndex];
+
+    // Request the next frame for real-time updates
+    requestAnimationFrame(analyzeAudio);
+}
+
+
+
+        // Start everything on page load
+        initializeAudio();
+    </script>
+</body>
+</html>
